@@ -2,10 +2,10 @@
 SET(CMAKE_SYSTEM_NAME Generic)
 
 # which compilers to use for C and C++
-SET(CMAKE_C_COMPILER /opt/cross-tools/bin/sdcc)
+SET(CMAKE_C_COMPILER sdcc)
 
 # here is the target environment is located
-SET(CMAKE_FIND_ROOT_PATH  /opt/cross-tools/share/sdcc )
+SET(CMAKE_FIND_ROOT_PATH /usr/local/share/sdcc)
 
 set(CMAKE_C_FLAGS_INIT  "-mstm8 --std-sdcc99")
 # Flags used by the compiler during all build types.
@@ -14,9 +14,8 @@ set(CMAKE_C_FLAGS       "-mstm8 --std-sdcc99")
 set(CMAKE_C_FLAGS_DEBUG "--debug --allow-unsafe-read")
 # Flags used by the compiler during release builds for minimum
 # size.
-set(CMAKE_C_FLAGS_MINSIZEREL "--model-small --opt-code-size")
+set(CMAKE_C_FLAGS_MINSIZEREL "--opt-code-size")
 # Flags used by the compiler during release builds.
-set(CMAKE_C_FLAGS_RELEASE   "--model-small")
 #Flags used by the compiler during release builds with debug info.
 set(CMAKE_C_FLAGS_RELWITHDEBINFO "--debug")
 
