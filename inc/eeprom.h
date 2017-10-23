@@ -23,6 +23,7 @@ union frame_t {
     } frame_struct;
 };
 
+void eeprom_init(void);
 void add_to_received(unsigned char c);
 
 #endif //LT200_DATAPLUG_EEPROM_H

@@ -23,7 +23,8 @@ CFLAGS   = -mstm8 --debug
 LIBS     = -lstm8
 
 clean:
-	rm -rf **/*.asm **/*.cdb **/*.lk **/*.lst **/*.map **/*.rel **/*.rst **/*.sym
+	rm -rf *.asm *.adb *.cdb *.lk *.lst *.map *.rel *.rst *.sym
+	rm -rf **/*.asm **/*.adb **/*.cdb **/*.lk **/*.lst **/*.map **/*.rel **/*.rst **/*.sym
 
 # This just provides the conventional target name "all"; it is optional
 # Note: I assume you set PNAME via some means not exhibited in your original file

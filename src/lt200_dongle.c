@@ -76,6 +76,8 @@ void main(void)
 
     setup_uart();
 
+    eeprom_init();
+
     rmi();
 
     for(;;)
