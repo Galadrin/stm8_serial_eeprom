@@ -5,6 +5,8 @@
 #ifndef LT200_DATAPLUG_STM8S_H_H
 #define LT200_DATAPLUG_STM8S_H_H
 
+#include <stdint.h>
+
 /* PORT A */
 #define PA_ODR      (*(volatile uint8_t *)0x5000)   /* data output latch register */
 #define PA_IDR      (*(volatile uint8_t *)0x5001)   /* input pin value register */
@@ -78,6 +80,17 @@
 #define CLK_HSITRIMR    (*(volatile uint8_t *)0x50cc)   /* HSI clock calibration trimming register */
 #define CLK_SWIMCCR    (*(volatile uint8_t *)0x50cd)   /* SWIM clock control register  */
 
+/* CLK_SWCR bits */
+#define SWCR_SWIF   0x08
+#define SWCR_SWIEN  0x04
+#define SWCR_SWEN   0x02
+#define SWCR_SWBSY  0x01
+
+/* CLK_SWR values */
+#define SWR_HSI     0xE1
+#define SWR_LSI     0xD2
+#define SWR_HSE     0xB4
+
 /* PCKENR1/2 bits */
 #define PCKEN1_TIM1  0x80
 #define PCKEN1_TIM2  0x20
@@ -94,15 +107,15 @@
 
 #define UART1_SR    (*(volatile uint8_t *)0x5230)   /* UART1 status register */
 #define UART1_DR    (*(volatile uint8_t *)0x5231)   /* UART1 data register */
-#define UART1_BRR1    (*(volatile uint8_t *)0x5232)   /* UART1 baud rate register 1 */
-#define UART1_BRR2    (*(volatile uint8_t *)0x5233)   /* UART1 baud rate register 2 */
-#define UART1_CR1    (*(volatile uint8_t *)0x5234)   /* UART1 control register 1 */
-#define UART1_CR2    (*(volatile uint8_t *)0x5235)   /* UART1 control register 2 */
-#define UART1_CR3    (*(volatile uint8_t *)0x5236)   /* UART1 control register 3 */
-#define UART1_CR4    (*(volatile uint8_t *)0x5237)   /* UART1 control register 4 */
-#define UART1_CR5    (*(volatile uint8_t *)0x5238)   /* UART1 control register 5 */
-#define UART1_GTR    (*(volatile uint8_t *)0x5239)   /* UART1 guard time register */
-#define UART1_PSCR    (*(volatile uint8_t *)0x523A)   /* UART1 prescaler register  */
+#define UART1_BRR1  (*(volatile uint8_t *)0x5232)   /* UART1 baud rate register 1 */
+#define UART1_BRR2  (*(volatile uint8_t *)0x5233)   /* UART1 baud rate register 2 */
+#define UART1_CR1   (*(volatile uint8_t *)0x5234)   /* UART1 control register 1 */
+#define UART1_CR2   (*(volatile uint8_t *)0x5235)   /* UART1 control register 2 */
+#define UART1_CR3   (*(volatile uint8_t *)0x5236)   /* UART1 control register 3 */
+#define UART1_CR4   (*(volatile uint8_t *)0x5237)   /* UART1 control register 4 */
+#define UART1_CR5   (*(volatile uint8_t *)0x5238)   /* UART1 control register 5 */
+#define UART1_GTR   (*(volatile uint8_t *)0x5239)   /* UART1 guard time register */
+#define UART1_PSCR  (*(volatile uint8_t *)0x523A)   /* UART1 prescaler register  */
 
 
 #define UART_CR2_TEN (1 << 3)
