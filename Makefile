@@ -1,6 +1,8 @@
 # We're assuming POSIX conformance
 .POSIX:
 
+.PHONY: all clean flash
+
 PNAME=lt200_dongle
 
 CC = sdcc
@@ -10,29 +12,38 @@ MAINSRC = src/$(PNAME).c
 
 # These are the sources that must be compiled to .rel files:
 EXTRASRCS = \
-    src/clock.c		\
     src/crc16.c		\
     src/eeprom.c	\
-    src/gpio.c    
+    stm8_hal/stm8s_clk.c \
+    stm8_hal/stm8s_gpio.c \
+    stm8_hal/stm8s_tim4.c \
+    stm8_hal/stm8s_uart1.c \
+    stm8_hal/stm8s_flash.c
 
 # The list of .rel files can be derived from the list of their source files
 RELS = $(EXTRASRCS:.c=.rel)
 
-INCLUDES = -Iinc
-CFLAGS   = -mstm8 --debug
-LIBS     = -lstm8
-
-clean:
-	rm -rf *.asm *.adb *.cdb *.lk *.lst *.map *.rel *.rst *.sym
-	rm -rf **/*.asm **/*.adb **/*.cdb **/*.lk **/*.lst **/*.map **/*.rel **/*.rst **/*.sym
+INCLUDES = -Iinc -Istm8_hal
+CFLAGS = --std-sdcc99 -DSTM8S003= -mstm8 --out-fmt-ihx --opt-code-size
+LIBS = -lstm8
 
 # This just provides the conventional target name "all"; it is optional
 # Note: I assume you set PNAME via some means not exhibited in your original file
 all: $(PNAME)
 
+clean:
+	rm -rf *.asm *.adb *.cdb *.lk *.lst *.map *.rel *.rst *.sym
+	rm -rf **/*.asm **/*.adb **/*.cdb **/*.lk **/*.lst **/*.map **/*.rel **/*.rst **/*.sym
+
+flash_discovery: $(PNAME)
+	@stm8flash -cstlink -pstm8s003k3 -w $(PNAME).ihx
+
+flash_leroydp: $(PNAME)
+	@stm8flash -cstlink -pstm8s003f3 -w $(PNAME).ihx
+
 # How to build the overall program
 $(PNAME): $(MAINSRC) $(RELS)
-	$(CC) $(INCLUDES) $(CFLAGS) $(MAINSRC) $(RELS) $(LIBS)
+	@$(CC) $(INCLUDES) $(CFLAGS) $(MAINSRC) $(RELS) $(LIBS)
 
 # How to build any .rel file from its corresponding .c file
 # GNU would have you use a pattern rule for this, but that's GNU-specific

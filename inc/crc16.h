@@ -5,8 +5,7 @@
 #ifndef LT200_DATAPLUG_CRC16_H
 #define LT200_DATAPLUG_CRC16_H
 
-#include "typedef.h"
-
+#include "stm8s.h"
 /**
  * crc16 - compute the CRC-16 for the data buffer
  * @crc:	previous CRC value

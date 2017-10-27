@@ -5,11 +5,12 @@ project(lt200_dataplug C)
 
 set(CMAKE_CXX_STANDARD 11)
 
-#include_directories(${CMAKE_CURRENT_SOURCE_DIR})
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/inc)
-#include_directories(/opt/cross-tools/share/sdcc/include/)
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/stm8_hal)
 
-ADD_EXECUTABLE(main src/lt200_dongle.c src/clock.c src/gpio.c src/eeprom.c inc/eeprom.h src/crc16.c inc/crc16.h inc/typedef.h)
+add_definitions(-DSTM8S003)
+
+ADD_EXECUTABLE(main src/lt200_dongle.c src/eeprom.c src/crc16.c stm8_hal/stm8s_gpio.c stm8_hal/stm8s_clk.c stm8_hal/stm8s_tim4.c stm8_hal/stm8s_uart1.c)
 
 add_custom_command(TARGET main
         POST_BUILD

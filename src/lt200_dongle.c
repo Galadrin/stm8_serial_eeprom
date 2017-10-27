@@ -8,40 +8,43 @@
 
 // Source code under CC0 1.0
 
-#include "../inc/typedef.h"
-#include "../inc/stm8s003.h"
+#include <stdio.h>
+#include "../stm8_hal/stm8s.h"
 #include "../inc/eeprom.h"
+#include "../stm8_hal/stm8s_uart1.h"
 
-#define rmi() \
-{ __asm__("rim"); } /* Enable interrupts */
+#define ACK "\xF8\xF0\x01\xFF\x83\x70"
+#define NACK "\xF8\xF0\x01\x00\xC3\x30"
 
-#define wfi() \
-{ __asm__("wfi\n"); } /* Wait For Interrupt */
+#undef DISCOVERY
+//#define DISCOVERY
+#ifdef DISCOVERY
+#define GPIO_LED    GPIOD, GPIO_PIN_0
+#else
+#define GPIO_LED    GPIOD, GPIO_PIN_1
+#endif
 
-
-void putchar(char c)
-{
-    while(!(USART1_SR & USART_SR_TXE));
-
-    USART1_DR = c;
+void putchar(uint8_t c) {
+    while ((UART1->SR & (u8) UART1_FLAG_TXE) == RESET);
+    UART1_SendData8(c);
 }
 
-void TIM4_OVF() __interrupt 23
+INTERRUPT_HANDLER(TIM4_handler, ITC_IRQ_TIM4_OVF)
 {
-    /* reset the received data */
+    GPIO_WriteReverse(GPIO_LED);
 
+    TIM4_ClearITPendingBit(TIM4_IT_UPDATE);
+    reset_frame();
 }
 
-void USARTRX_DataFull() __interrupt 18
+INTERRUPT_HANDLER(UART1_rxFull, ITC_IRQ_UART1_RX)
 {
     unsigned char c;
-    c = USART1_DR;
+    c = UART1->DR;
+    TIM4_Cmd(DISABLE);
+    TIM4_SetCounter(0x00);
+    TIM4_Cmd(ENABLE);
     add_to_received(c);
-
-    /* sign of life */
-    GPIO_Toggle_Pin(GPIO_PORT_D, GPIO_PIN_0);
-
-
 }
 
 void setup_gpio() {
@@ -52,15 +55,40 @@ floating (reset state),
 • configured as input with internal pull-up/down resistor,
 • configured as output push-pull low.
  */
-    GPIO_Config_Pin(GPIO_PORT_D, GPIO_PIN_6, PIN_MODE_INPUT_PU_NO_INT);
-    GPIO_Config_Pin(GPIO_PORT_D, GPIO_PIN_5, PIN_MODE_OUTPUT_PP);
-    GPIO_Config_Pin(GPIO_PORT_D, GPIO_PIN_0, PIN_MODE_OUTPUT_PP);
+    /* UART GPIO */
+    GPIO_Init(GPIOD, GPIO_PIN_6, GPIO_MODE_IN_PU_NO_IT);
+    GPIO_Init(GPIOD, GPIO_PIN_5, GPIO_MODE_OUT_PP_LOW_FAST);
+
+    /* GPIOD_0 => LED carte eval */
+    //GPIO_Init(GPIOD, GPIO_PIN_0, GPIO_MODE_OUT_PP_LOW_FAST);
+
+    /* GPIOB_4 => LED carte définitive */
+    GPIO_Init(GPIO_LED, GPIO_MODE_OUT_PP_LOW_FAST);
 }
 
 void setup_uart() {
-    USART1_CR2 = USART_CR2_TEN | USART_CR2_REN | USART_CR2_RIEN; // Allow TX and RX
-    USART1_CR3 &= ~(USART_CR3_STOP1 | USART_CR3_STOP2); // 1 stop bit
-    USART1_BRR2 = 0x03; USART1_BRR1 = 0x68; // 9600 baud
+    UART1_DeInit();
+    /* UART1 and UART3 configured as follow:
+          - BaudRate = 9600 baud
+          - Word Length = 8 Bits
+          - One Stop Bit
+          - No parity
+          - Receive and transmit enabled
+          - UART1 Clock disabled
+     */
+    /* Configure the UART1 */
+    UART1_Init((uint32_t)9600, UART1_WORDLENGTH_8D, UART1_STOPBITS_1, UART1_PARITY_NO,
+               UART1_SYNCMODE_CLOCK_DISABLE, UART1_MODE_TXRX_ENABLE);
+    /* Enable UART1 Transmit interrupt*/
+    UART1_ITConfig(UART1_IT_RXNE_OR, ENABLE);
+    UART1_Cmd(ENABLE);
+}
+
+void setup_timer() {
+    TIM4_DeInit();
+    TIM4_TimeBaseInit(TIM4_PRESCALER_128, 250);
+    TIM4_ITConfig(TIM4_IT_UPDATE, ENABLE);
+    TIM4_Cmd(ENABLE);
 }
 
 void enter_wait_mode() {
@@ -68,25 +96,69 @@ void enter_wait_mode() {
 and resumes processing.*/
 }
 
-void main(void)
-{
-	CLK_Init(CLK_SRC_HSI, CLK_HSI_DIV_NONE, CLK_CPU_DIV_MASTER_NONE);
-    CLK_Enable(PCKEN1_TIM4 | PCKEN1_UART1, 0x00);
-    setup_gpio();
-
-    setup_uart();
-
-    eeprom_init();
-
-    rmi();
-
-    for(;;)
-	{
-        /* wait for start frame ID */
-        do {
-            wfi();
-        }
-        while(1);
-	}
+void send_ack(void){
+    int i;
+    putchar(sizeof(ACK));
+    for (i = 0; i < sizeof(ACK); i++) {
+        putchar((uint8_t) ACK[i++]);
+    }
 }
 
+void send_nack(void) {
+    int i;
+    for (i = 0; i < sizeof(NACK); i++)
+        putchar((uint8_t) NACK[i++]);
+}
+
+void main(void) {
+    disableInterrupts();
+
+    CLK_DeInit();
+    CLK_SYSCLKConfig(CLK_PRESCALER_HSIDIV1);
+    CLK_ClockSwitchConfig(CLK_SWITCHMODE_AUTO, CLK_SOURCE_HSI, DISABLE,
+                          CLK_CURRENTCLOCKSTATE_DISABLE);
+    CLK_PeripheralClockConfig(CLK_PERIPHERAL_TIMER4, ENABLE);
+    CLK_PeripheralClockConfig(CLK_PERIPHERAL_UART1, ENABLE);
+
+    /* Configure the UART1 */
+    setup_gpio();
+    setup_uart();
+    setup_timer();
+    eeprom_init();
+
+    enableInterrupts();
+
+    for (;;) {
+        wfi();
+            if(have_valid_frame) {
+                GPIO_WriteHigh(GPIO_LED);
+                if (valid_frame.frame_struct.cmd == CMD_WRITE) {
+                    if (store_frame() == SUCCESS)
+                        send_ack();
+                    else
+                        send_nack();
+                }
+                if (valid_frame.frame_struct.cmd == CMD_READ) {
+                    union frame_t frame_to_send;
+                    uint8_t i;
+                    read_eeprom(&frame_to_send.frame_struct, valid_frame.frame_struct.data[0]);
+
+                    putchar(frame_to_send.frame_struct.flag);
+                    putchar(frame_to_send.frame_struct.cmd);
+                    putchar(frame_to_send.frame_struct.size);
+                    for (i = 0; i < frame_to_send.frame_struct.size; i++)
+                        putchar(frame_to_send.frame_struct.data[i]);
+                    // crc 16
+                    putchar(frame_to_send.frame[i++]);
+                    putchar(frame_to_send.frame[i++]);
+
+                }
+                have_valid_frame = 0;
+                GPIO_WriteLow(GPIO_LED);
+            }
+            if(have_error_frame) {
+                send_nack();
+                have_error_frame = 0;
+            }
+    }
+}
