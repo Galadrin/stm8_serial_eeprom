@@ -20,10 +20,16 @@ union frame_t temp_frame, valid_frame;
 uint8_t have_valid_frame, have_error_frame;
 static unsigned char rcv_index = 0;
 
+/*!
+ * eeprom_init - here is the eeprom initialisation
+ */
 void eeprom_init(void) {
 
 }
 
+/*!
+ * reset_frame - reset all values to zero
+ */
 void reset_frame(void)
 {
     if (rcv_index > 0) {
@@ -34,7 +40,10 @@ void reset_frame(void)
     }
 }
 
-
+/*!
+ * add_to_received - this function manage the received byte.
+ * @param c - the received byte.
+ */
 void add_to_received(unsigned char c)
 {
     temp_frame.frame[rcv_index] = c;
@@ -107,6 +116,10 @@ void add_to_received(unsigned char c)
     }
 }
 
+/*!
+ * store_frame - write a received valid frame to the eeprom
+ * @return SUCCESS or ERROR
+ */
 ErrorStatus store_frame(void) {
     uint8_t index = 0;
 
@@ -131,6 +144,11 @@ ErrorStatus store_frame(void) {
     return SUCCESS;
 }
 
+/*!
+ * read_eeprom - read the nb_data bytes from eeprom
+ * @param buff - the buffer were read data are stored
+ * @param nb_data - the number of byte to read
+ */
 void read_eeprom(struct frame_struct_t* buff, uint8_t nb_data)
 {
     uint8_t index;

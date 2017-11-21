@@ -34,6 +34,7 @@ void putchar(uint8_t c) {
     UART1_SendData8(c);
 }
 
+/* Timer interrupt handler */
 INTERRUPT_HANDLER(TIM4_handler, ITC_IRQ_TIM4_OVF)
 {
     GPIO_WriteReverse(GPIO_D3);
@@ -44,20 +45,23 @@ INTERRUPT_HANDLER(TIM4_handler, ITC_IRQ_TIM4_OVF)
     GPIO_WriteLow(GPIO_C4);
 }
 
+/* UART interrupt handler */
 INTERRUPT_HANDLER(UART1_rxFull, ITC_IRQ_UART1_RX)
 {
     unsigned char c;
     UART1_GetFlagStatus(UART1_FLAG_OR);
-//    c = UART1->DR;
     c = UART1_ReceiveData8();
     GPIO_WriteReverse(GPIO_C4);
     TIM4_Cmd(DISABLE);
     TIM4_SetCounter(0x00);
     TIM4_Cmd(ENABLE);
-//    putchar(c);
+
     add_to_received(c);
 }
 
+/*!
+ * setup_clock - Setup the prescaler and activate external clock.
+ */
 void setup_clock() {
 
     CLK_DeInit();
@@ -82,6 +86,9 @@ void setup_clock() {
 
 }
 
+/*!
+ * setup_gpio - Set the GPIO direction and function.
+ */
 void setup_gpio() {
     /* Unused I/O pins must not be left floating to avoid extra current consumption. They must be
 put into one of the following configurations:
@@ -104,6 +111,9 @@ floating (reset state),
     GPIO_Init(GPIO_C6, GPIO_MODE_OUT_PP_LOW_FAST);
 }
 
+/*!
+ * setup_uart - setup the UART baudrate and options.
+ */
 void setup_uart() {
     UART1_DeInit();
     /* UART1 and UART3 configured as follow:
@@ -122,6 +132,9 @@ void setup_uart() {
     UART1_Cmd(ENABLE);
 }
 
+/*!
+ * setup_timer - setup the timer 4 prescaler.
+ */
 void setup_timer() {
     uint32_t prescal = 0;
     uint32_t timer_freq = 500;
@@ -136,11 +149,9 @@ void setup_timer() {
     TIM4_Cmd(ENABLE);
 }
 
-void enter_wait_mode() {
-    /* When an internal or external interrupt request occurs, the CPU wakes-up from Wait mode
-and resumes processing.*/
-}
-
+/*!
+ * send_ack - send the ACK message
+ */
 void send_ack(void){
     int i;
     for (i = 0; i < sizeof(ACK) - 1; i++) {
@@ -148,12 +159,18 @@ void send_ack(void){
     }
 }
 
+/*!
+ * send_nack - send the NACK message
+ */
 void send_nack(void) {
     int i;
     for (i = 0; i < sizeof(NACK) - 1; i++)
         putchar((uint8_t) NACK[i]);
 }
 
+/*!
+ * main - main program.
+ */
 void main(void) {
     disableInterrupts();
 

@@ -51,7 +51,7 @@ static inline uint16_t crc16_byte(uint16_t crc, const uint8_t data)
  * @buffer:	data pointer
  * @len:	number of bytes in the buffer
  *
- * Returns the updated CRC value.
+ * @return: Returns the updated CRC value.
  */
 uint16_t crc16(uint16_t crc, uint8_t const *buffer, uint16_t len)
 {
