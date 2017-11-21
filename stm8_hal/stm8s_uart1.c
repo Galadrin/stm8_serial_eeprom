@@ -119,13 +119,16 @@ void UART1_Init(uint32_t BaudRate, UART1_WordLength_TypeDef WordLength,
 
     /* Set the UART1 BaudRates in BRR1 and BRR2 registers according to UART1_BaudRate value */
     BaudRate_Mantissa    = ((uint32_t)CLK_GetClockFreq() / (BaudRate << 4));
+    //BaudRate_Mantissa    = ((uint32_t)10000000 / (BaudRate << 4));
     BaudRate_Mantissa100 = (((uint32_t)CLK_GetClockFreq() * 100) / (BaudRate << 4));
+    //BaudRate_Mantissa100 = (((uint32_t)10000000 * 100) / (BaudRate << 4));
+
     /* Set the fraction of UART1DIV  */
-    UART1->BRR2 |= (uint8_t)((uint8_t)(((BaudRate_Mantissa100 - (BaudRate_Mantissa * 100)) << 4) / 100) & (uint8_t)0x0F); 
+    UART1->BRR2 |= (uint8_t)((uint8_t)(((BaudRate_Mantissa100 - (BaudRate_Mantissa * 100)) << 4) / 100) & (uint8_t)0x0F);
     /* Set the MSB mantissa of UART1DIV  */
-    UART1->BRR2 |= (uint8_t)((BaudRate_Mantissa >> 4) & (uint8_t)0xF0); 
+    UART1->BRR2 |= (uint8_t)((BaudRate_Mantissa >> 4) & (uint8_t)0xF0);
     /* Set the LSB mantissa of UART1DIV  */
-    UART1->BRR1 |= (uint8_t)BaudRate_Mantissa;           
+    UART1->BRR1 |= (uint8_t)BaudRate_Mantissa;
 
     /* Disable the Transmitter and Receiver before seting the LBCL, CPOL and CPHA bits */
     UART1->CR2 &= (uint8_t)~(UART1_CR2_TEN | UART1_CR2_REN); 

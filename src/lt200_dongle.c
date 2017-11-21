@@ -12,6 +12,7 @@
 #include "../stm8_hal/stm8s.h"
 #include "../inc/eeprom.h"
 #include "../stm8_hal/stm8s_uart1.h"
+#include "../inc/crc16.h"
 
 #define ACK "\xF8\xF0\x01\xFF\x83\x70"
 #define NACK "\xF8\xF0\x01\x00\xC3\x30"
@@ -24,6 +25,10 @@
 #define GPIO_LED    GPIOD, GPIO_PIN_1
 #endif
 
+#define GPIO_D3     GPIOD, GPIO_PIN_3
+#define GPIO_C4     GPIOC, GPIO_PIN_4
+#define GPIO_C6     GPIOC, GPIO_PIN_6
+
 void putchar(uint8_t c) {
     while ((UART1->SR & (u8) UART1_FLAG_TXE) == RESET);
     UART1_SendData8(c);
@@ -31,20 +36,50 @@ void putchar(uint8_t c) {
 
 INTERRUPT_HANDLER(TIM4_handler, ITC_IRQ_TIM4_OVF)
 {
-    GPIO_WriteReverse(GPIO_LED);
+    GPIO_WriteReverse(GPIO_D3);
 
     TIM4_ClearITPendingBit(TIM4_IT_UPDATE);
     reset_frame();
+
+    GPIO_WriteLow(GPIO_C4);
 }
 
 INTERRUPT_HANDLER(UART1_rxFull, ITC_IRQ_UART1_RX)
 {
     unsigned char c;
-    c = UART1->DR;
+    UART1_GetFlagStatus(UART1_FLAG_OR);
+//    c = UART1->DR;
+    c = UART1_ReceiveData8();
+    GPIO_WriteReverse(GPIO_C4);
     TIM4_Cmd(DISABLE);
     TIM4_SetCounter(0x00);
     TIM4_Cmd(ENABLE);
+//    putchar(c);
     add_to_received(c);
+}
+
+void setup_clock() {
+
+    CLK_DeInit();
+    CLK_SYSCLKConfig(CLK_PRESCALER_HSIDIV1);
+
+
+#ifdef DISCOVERY
+    CLK_ClockSwitchConfig(CLK_SWITCHMODE_AUTO, CLK_SOURCE_HSI, DISABLE,
+                          CLK_CURRENTCLOCKSTATE_DISABLE);
+#else
+    CLK_ClockSwitchConfig(CLK_SWITCHMODE_AUTO, CLK_SOURCE_HSE, DISABLE,
+                          CLK_CURRENTCLOCKSTATE_DISABLE);
+    /* wait until external clock establishment */
+    while(CLK_GetSYSCLKSource() != CLK_SOURCE_HSE);
+
+#endif
+    /* Disable all peripherals and enable only timer and UART */
+    CLK->PCKENR1 = 0x00;
+    CLK->PCKENR2 = 0x00;
+    CLK_PeripheralClockConfig(CLK_PERIPHERAL_TIMER4, ENABLE);
+    CLK_PeripheralClockConfig(CLK_PERIPHERAL_UART1, ENABLE);
+
 }
 
 void setup_gpio() {
@@ -64,6 +99,9 @@ floating (reset state),
 
     /* GPIOB_4 => LED carte définitive */
     GPIO_Init(GPIO_LED, GPIO_MODE_OUT_PP_LOW_FAST);
+    GPIO_Init(GPIO_D3, GPIO_MODE_OUT_PP_LOW_FAST);
+    GPIO_Init(GPIO_C4, GPIO_MODE_OUT_PP_HIGH_FAST);
+    GPIO_Init(GPIO_C6, GPIO_MODE_OUT_PP_LOW_FAST);
 }
 
 void setup_uart() {
@@ -85,8 +123,15 @@ void setup_uart() {
 }
 
 void setup_timer() {
+    uint32_t prescal = 0;
+    uint32_t timer_freq = 500;
+
     TIM4_DeInit();
-    TIM4_TimeBaseInit(TIM4_PRESCALER_128, 250);
+    /* setup timer at 2ms */
+    prescal = ((uint32_t)CLK_GetClockFreq() / 128) / timer_freq;
+    //prescal = ((uint32_t)10000000 / 128) / timer_freq;
+
+    TIM4_TimeBaseInit(TIM4_PRESCALER_128, (uint8_t) prescal);
     TIM4_ITConfig(TIM4_IT_UPDATE, ENABLE);
     TIM4_Cmd(ENABLE);
 }
@@ -98,36 +143,32 @@ and resumes processing.*/
 
 void send_ack(void){
     int i;
-    putchar(sizeof(ACK));
-    for (i = 0; i < sizeof(ACK); i++) {
-        putchar((uint8_t) ACK[i++]);
+    for (i = 0; i < sizeof(ACK) - 1; i++) {
+        putchar((uint8_t) ACK[i]);
     }
 }
 
 void send_nack(void) {
     int i;
-    for (i = 0; i < sizeof(NACK); i++)
-        putchar((uint8_t) NACK[i++]);
+    for (i = 0; i < sizeof(NACK) - 1; i++)
+        putchar((uint8_t) NACK[i]);
 }
 
 void main(void) {
     disableInterrupts();
 
-    CLK_DeInit();
-    CLK_SYSCLKConfig(CLK_PRESCALER_HSIDIV1);
-    CLK_ClockSwitchConfig(CLK_SWITCHMODE_AUTO, CLK_SOURCE_HSI, DISABLE,
-                          CLK_CURRENTCLOCKSTATE_DISABLE);
-    CLK_PeripheralClockConfig(CLK_PERIPHERAL_TIMER4, ENABLE);
-    CLK_PeripheralClockConfig(CLK_PERIPHERAL_UART1, ENABLE);
-
-    /* Configure the UART1 */
+    setup_clock();
     setup_gpio();
+    /* Configure the UART1 */
     setup_uart();
+    /* Configure Timer */
     setup_timer();
     eeprom_init();
-
     enableInterrupts();
 
+    CLK_CCOConfig(CLK_OUTPUT_MASTER);
+
+GPIO_WriteLow(GPIO_LED);
     for (;;) {
         wfi();
             if(have_valid_frame) {
@@ -141,24 +182,31 @@ void main(void) {
                 if (valid_frame.frame_struct.cmd == CMD_READ) {
                     union frame_t frame_to_send;
                     uint8_t i;
-                    read_eeprom(&frame_to_send.frame_struct, valid_frame.frame_struct.data[0]);
-
-                    putchar(frame_to_send.frame_struct.flag);
-                    putchar(frame_to_send.frame_struct.cmd);
-                    putchar(frame_to_send.frame_struct.size);
-                    for (i = 0; i < frame_to_send.frame_struct.size; i++)
-                        putchar(frame_to_send.frame_struct.data[i]);
-                    // crc 16
-                    putchar(frame_to_send.frame[i++]);
-                    putchar(frame_to_send.frame[i++]);
-
+                    uint16_t crc = 0x00;
+                    if (valid_frame.frame_struct.data[0] > 128) {
+                        send_nack();
+                    } else {
+                        read_eeprom(&frame_to_send.frame_struct, valid_frame.frame_struct.data[0]);
+                        crc = crc16(0x00, (const uint8_t *) &frame_to_send.frame,
+                                    (uint16_t) (frame_to_send.frame_struct.size + 3));
+                        putchar(frame_to_send.frame_struct.flag);
+                        putchar(frame_to_send.frame_struct.cmd);
+                        putchar(frame_to_send.frame_struct.size);
+                        for (i = 0; i < frame_to_send.frame_struct.size; i++)
+                            putchar(frame_to_send.frame_struct.data[i]);
+                        // crc 16
+                        putchar((uint8_t) (crc >> 8));
+                        putchar((uint8_t) (crc & 0x00FF));
+                    }
                 }
                 have_valid_frame = 0;
                 GPIO_WriteLow(GPIO_LED);
             }
             if(have_error_frame) {
+                GPIO_WriteHigh(GPIO_LED);
                 send_nack();
                 have_error_frame = 0;
+                GPIO_WriteLow(GPIO_LED);
             }
     }
 }

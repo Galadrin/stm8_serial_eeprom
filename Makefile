@@ -24,11 +24,12 @@ EXTRASRCS = \
 RELS = $(EXTRASRCS:.c=.rel)
 
 INCLUDES = -Iinc -Istm8_hal
-CFLAGS = --std-sdcc99 -DSTM8S003= -mstm8 --out-fmt-ihx --opt-code-size
+CFLAGS = --std-sdcc99 -DSTM8S003= -DHSE_VALUE=\(\(u32\)10000000\) -mstm8 --out-fmt-ihx --opt-code-size
 LIBS = -lstm8
 
+.PHONY: all clean flash_leroydp flash_discovery
+
 # This just provides the conventional target name "all"; it is optional
-# Note: I assume you set PNAME via some means not exhibited in your original file
 all: $(PNAME)
 
 clean:
